@@ -1,0 +1,296 @@
+**** SQL Code ****
+**-- =========================
+-- DATABASE CREATION
+-- =========================**
+CREATE DATABASE CinemaManagement;
+USE CinemaManagement;
+
+**-- =========================
+-- TABLES
+-- =========================**
+
+-- Cinema Admin Table
+CREATE TABLE CinemaAdmin (
+    AdminID INT AUTO_INCREMENT PRIMARY KEY,
+    FirstName VARCHAR(100),
+    LastName VARCHAR(100),
+    Email VARCHAR(100) UNIQUE,
+    Phone VARCHAR(20),
+    Password VARCHAR(100)
+);
+
+-- Genre Table
+CREATE TABLE Genre (
+    GenreID INT AUTO_INCREMENT PRIMARY KEY,
+    GenreName VARCHAR(50)
+);
+
+-- Movie Table
+CREATE TABLE Movie (
+    MovieID INT AUTO_INCREMENT PRIMARY KEY,
+    AdminID INT,
+    MovieName VARCHAR(100),
+    Description TEXT,
+    ReleaseDate DATE,
+    Duration INT,
+    Language VARCHAR(50),
+    GenreID INT,
+    FOREIGN KEY (AdminID) REFERENCES CinemaAdmin(AdminID),
+    FOREIGN KEY (GenreID) REFERENCES Genre(GenreID)
+);
+
+-- Customer Table
+CREATE TABLE Customer (
+    CustomerID INT AUTO_INCREMENT PRIMARY KEY,
+    FirstName VARCHAR(100),
+    LastName VARCHAR(100),
+    Email VARCHAR(100),
+    Phone VARCHAR(20)
+);
+
+-- Screen Table
+CREATE TABLE Screen (
+    ScreenID INT AUTO_INCREMENT PRIMARY KEY,
+    ScreenName VARCHAR(50),
+    TotalSeats INT
+);
+
+-- Seat Table (Normalized Seat Tracking)
+CREATE TABLE Seat (
+    SeatID INT AUTO_INCREMENT PRIMARY KEY,
+    ScreenID INT,
+    SeatNumber VARCHAR(10),
+    FOREIGN KEY (ScreenID) REFERENCES Screen(ScreenID)
+);
+
+-- Shows Table
+CREATE TABLE Shows (
+    ShowID INT AUTO_INCREMENT PRIMARY KEY,
+    MovieID INT,
+    ScreenID INT,
+    ShowDate DATE,
+    ShowTime TIME,
+    TicketPrice DECIMAL(10,2),
+    FOREIGN KEY (MovieID) REFERENCES Movie(MovieID),
+    FOREIGN KEY (ScreenID) REFERENCES Screen(ScreenID)
+);
+
+-- Booking Table
+CREATE TABLE Booking (
+    BookingID INT AUTO_INCREMENT PRIMARY KEY,
+    CustomerID INT,
+    ShowID INT,
+    BookingDate DATE,
+    TotalAmount DECIMAL(10,2) DEFAULT 0,
+    BookingStatus VARCHAR(50),
+    FOREIGN KEY (CustomerID) REFERENCES Customer(CustomerID),
+    FOREIGN KEY (ShowID) REFERENCES Shows(ShowID)
+);
+
+-- BookingSeat Table (each booking linked to seats)
+CREATE TABLE BookingSeat (
+    BookingSeatID INT AUTO_INCREMENT PRIMARY KEY,
+    BookingID INT,
+    SeatID INT,
+    FOREIGN KEY (BookingID) REFERENCES Booking(BookingID),
+    FOREIGN KEY (SeatID) REFERENCES Seat(SeatID),
+    UNIQUE (BookingID, SeatID) -- Prevent same seat booked twice
+);
+
+-- Payment Table
+CREATE TABLE Payment (
+    PaymentID INT AUTO_INCREMENT PRIMARY KEY,
+    BookingID INT,
+    PaymentDate DATE,
+    Amount DECIMAL(10,2),
+    PaymentMethod VARCHAR(50),
+    FOREIGN KEY (BookingID) REFERENCES Booking(BookingID)
+);
+
+**-- =========================
+-- TRIGGERS
+-- =========================**
+
+-- Trigger to calculate total amount after booking seats
+DELIMITER //
+CREATE TRIGGER CalculateTotalAmountAfterBooking
+AFTER INSERT ON BookingSeat
+FOR EACH ROW
+BEGIN
+    DECLARE ticketPrice DECIMAL(10,2);
+    SELECT TicketPrice INTO ticketPrice
+    FROM Shows
+    JOIN Booking B ON Shows.ShowID = B.ShowID
+    WHERE B.BookingID = NEW.BookingID;
+
+    UPDATE Booking
+    SET TotalAmount = (SELECT COUNT(*) * ticketPrice 
+                       FROM BookingSeat 
+                       WHERE BookingID = NEW.BookingID)
+    WHERE BookingID = NEW.BookingID;
+END;
+//
+DELIMITER ;
+
+**-- =========================
+-- VIEWS
+-- =========================**
+CREATE VIEW PopularMovies AS
+SELECT M.MovieName, COUNT(B.BookingID) AS TotalBookings
+FROM Movie M
+JOIN Shows S ON M.MovieID = S.MovieID
+JOIN Booking B ON S.ShowID = B.ShowID
+GROUP BY M.MovieID
+HAVING TotalBookings > 0;
+
+**-- =========================
+-- SAMPLE DATA
+-- =========================**
+-- Cinema Admins
+INSERT INTO CinemaAdmin (FirstName, LastName, Email, Phone, Password) VALUES
+('Ali','Khan','ali.admin@cinema.com','0301111111','pass123'),
+('Sara','Malik','sara.admin@cinema.com','0302222222','pass123'),
+('Hassan','Raza','hassan.admin@cinema.com','0303333333','pass123'),
+('Fariha','Iqbal','fariha.admin@cinema.com','0304444444','pass123'),
+('Bilal','Ahmed','bilal.admin@cinema.com','0305555555','pass123'),
+('Sadia','Khan','sadia.admin@cinema.com','0306666666','pass123'),
+('Uzair','Ali','uzair.admin@cinema.com','0307777777','pass123'),
+('Hina','Malik','hina.admin@cinema.com','0308888888','pass123'),
+('Omar','Shah','omar.admin@cinema.com','0309999999','pass123'),
+('Zoya','Saeed','zoya.admin@cinema.com','0310000000','pass123');
+
+-- Genres
+INSERT INTO Genre (GenreName) VALUES
+('Action'),('Drama'),('Comedy'),('Horror'),('Romantic'),
+('Thriller'),('Sci-Fi'),('Adventure'),('Fantasy'),('Mystery');
+
+-- Movies
+INSERT INTO Movie (AdminID, MovieName, Description, ReleaseDate, Duration, Language, GenreID) VALUES
+(1,'Fast X','Action movie','2025-03-15',140,'English',1),
+(2,'Love Story','Romantic movie','2025-04-10',120,'Urdu',5),
+(3,'Haunted Night','Horror movie','2025-05-01',100,'English',4),
+(4,'Comedy Club','Comedy movie','2025-06-05',110,'Urdu',3),
+(5,'Drama Queen','Drama movie','2025-07-12',130,'English',2),
+(6,'Space Wars','Sci-Fi movie','2025-08-20',150,'English',7),
+(7,'Adventure Land','Adventure movie','2025-09-15',140,'English',8),
+(8,'Magic Realm','Fantasy movie','2025-10-10',125,'English',9),
+(9,'Mystery Case','Mystery movie','2025-11-05',115,'English',10),
+(10,'Thrill Ride','Thriller movie','2025-12-01',130,'English',6);
+
+-- Customers
+INSERT INTO Customer (FirstName, LastName, Email, Phone) VALUES
+('Ayesha','Khan','ayesha1@gmail.com','0311111111'),
+('Ahmed','Ali','ahmed1@gmail.com','0312222222'),
+('Sara','Shah','sara1@gmail.com','0313333333'),
+('Omar','Iqbal','omar1@gmail.com','0314444444'),
+('Hina','Saeed','hina1@gmail.com','0315555555'),
+('Bilal','Raza','bilal1@gmail.com','0316666666'),
+('Zoya','Malik','zoya1@gmail.com','0317777777'),
+('Uzair','Ahmed','uzair1@gmail.com','0318888888'),
+('Fariha','Khan','fariha1@gmail.com','0319999999'),
+('Hassan','Shah','hassan1@gmail.com','0320000000');
+
+-- Screens
+INSERT INTO Screen (ScreenName, TotalSeats) VALUES
+('Screen 1',200),('Screen 2',150),('Screen 3',180),('Screen 4',160),('Screen 5',200),
+('Screen 6',150),('Screen 7',180),('Screen 8',160),('Screen 9',200),('Screen 10',150);
+
+-- Seats (example 20 seats per screen for demo)
+INSERT INTO Seat (ScreenID, SeatNumber) VALUES
+(1,'A1'),(1,'A2'),(1,'A3'),(1,'A4'),(1,'A5'),(1,'A6'),(1,'A7'),(1,'A8'),(1,'A9'),(1,'A10'),
+(2,'A1'),(2,'A2'),(2,'A3'),(2,'A4'),(2,'A5'),(2,'A6'),(2,'A7'),(2,'A8'),(2,'A9'),(2,'A10');
+
+-- Shows
+INSERT INTO Shows (MovieID, ScreenID, ShowDate, ShowTime, TicketPrice) VALUES
+(1,1,'2026-02-10','18:00:00',800),
+(2,2,'2026-02-11','20:00:00',600),
+(3,3,'2026-02-12','19:00:00',700),
+(4,4,'2026-02-13','17:00:00',500),
+(5,5,'2026-02-14','21:00:00',750),
+(6,6,'2026-02-15','18:30:00',900),
+(7,7,'2026-02-16','20:30:00',650),
+(8,8,'2026-02-17','19:15:00',800),
+(9,9,'2026-02-18','21:30:00',700),
+(10,10,'2026-02-19','18:45:00',850);
+
+-- Bookings
+INSERT INTO Booking (CustomerID, ShowID, BookingDate, BookingStatus) VALUES
+(1,1,CURDATE(),'Confirmed'),
+(2,2,CURDATE(),'Confirmed');
+
+-- Booking Seats
+INSERT INTO BookingSeat (BookingID, SeatID) VALUES
+(1,1),(1,2),(2,11),(2,12);
+
+-- Payments
+INSERT INTO Payment (BookingID, PaymentDate, Amount, PaymentMethod) VALUES
+(1,CURDATE(),1600,'Card'), -- 2 seats * 800
+(2,CURDATE(),1200,'Cash'); -- 2 seats * 600
+
+**-- =========================
+-- CRUD Operations
+-- =========================**
+
+-- CinemaAdmin
+INSERT INTO CinemaAdmin (FirstName, LastName, Email, Phone, Password) VALUES ('Nadia','Qureshi','nadia.admin@gmail.com','0321111111','pass123');
+SELECT * FROM CinemaAdmin;
+UPDATE CinemaAdmin SET Phone='0333333333' WHERE AdminID=1;
+DELETE FROM CinemaAdmin WHERE AdminID=10;
+
+-- Genre
+INSERT INTO Genre (GenreName) VALUES ('Documentary');
+SELECT * FROM Genre;
+UPDATE Genre SET GenreName='Action/Adventure' WHERE GenreID=1;
+DELETE FROM Genre WHERE GenreID=10;
+
+-- Movie
+INSERT INTO Movie (AdminID, MovieName, Description, ReleaseDate, Duration, Language, GenreID)
+VALUES (1,'New Adventure','Exciting movie','2026-01-01',120,'English',8);
+SELECT * FROM Movie;
+UPDATE Movie SET Duration=150 WHERE MovieID=1;
+DELETE FROM Movie WHERE MovieID=10;
+
+-- Customer
+INSERT INTO Customer (FirstName, LastName, Email, Phone) VALUES ('Aliya','Saeed','aliya@gmail.com','0322222222');
+SELECT * FROM Customer;
+UPDATE Customer SET Phone='0323333333' WHERE CustomerID=1;
+DELETE FROM Customer WHERE CustomerID=10;
+
+-- Screen
+INSERT INTO Screen (ScreenName, TotalSeats) VALUES ('Screen 11',180);
+SELECT * FROM Screen;
+UPDATE Screen SET TotalSeats=250 WHERE ScreenID=1;
+DELETE FROM Screen WHERE ScreenID=10;
+
+-- Seat
+INSERT INTO Seat (ScreenID, SeatNumber) VALUES (1,'A11');
+SELECT * FROM Seat;
+UPDATE Seat SET SeatNumber='B1' WHERE SeatID=1;
+DELETE FROM Seat WHERE SeatID=10;
+
+-- Shows
+INSERT INTO Shows (MovieID, ScreenID, ShowDate, ShowTime, TicketPrice) VALUES (1,1,'2026-03-01','19:00:00',850);
+SELECT * FROM Shows;
+UPDATE Shows SET TicketPrice=900 WHERE ShowID=1;
+DELETE FROM Shows WHERE ShowID=10;
+
+-- Booking
+INSERT INTO Booking (CustomerID, ShowID, BookingDate, BookingStatus) VALUES (3,1,CURDATE(),'Confirmed');
+SELECT * FROM Booking;
+UPDATE Booking SET BookingStatus='Cancelled' WHERE BookingID=1;
+DELETE FROM Booking WHERE BookingID=10;
+
+-- BookingSeat
+INSERT INTO BookingSeat (BookingID, SeatID) VALUES (3,3);
+SELECT * FROM BookingSeat;
+UPDATE BookingSeat SET SeatID=4 WHERE BookingSeatID=3;
+DELETE FROM BookingSeat WHERE BookingSeatID=2;
+
+-- Payment
+INSERT INTO Payment (BookingID, PaymentDate, Amount, PaymentMethod) VALUES (3,CURDATE(),800,'Card');
+SELECT * FROM Payment;
+UPDATE Payment SET Amount=850 WHERE PaymentID=3;
+DELETE FROM Payment WHERE PaymentID=2;
+
+-- PopularMovies View
+SELECT * FROM PopularMovies;
